@@ -3,8 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Formatted to Markdown</title>
+  <title>remark</title>
   <style>
+    :root {
+      --body-bg: #f5f5f0;
+      --body-color: #222;
+      --header-p-color: #555;
+      --panel-label-color: #666;
+      --panel-bg: #fff;
+      --border-color: #ccc;
+      --border-focus: #555;
+      --button-bg: #fff;
+      --button-text: #333;
+      --button-hover: #eee;
+      --button-active: #ddd;
+      --copy-btn-bg: #222;
+      --copy-btn-text: #fff;
+      --copy-btn-hover: #444;
+      --copy-btn-border: #222;
+      --placeholder-color: #aaa;
+    }
+
+    .dark-theme {
+      --body-bg: #1a1a1a;
+      --body-color: #ddd;
+      --header-p-color: #aaa;
+      --panel-label-color: #999;
+      --panel-bg: #2d2d2d;
+      --border-color: #444;
+      --border-focus: #777;
+      --button-bg: #444;
+      --button-text: #eee;
+      --button-hover: #555;
+      --button-active: #666;
+      --copy-btn-bg: #eee;
+      --copy-btn-text: #222;
+      --copy-btn-hover: #ccc;
+      --copy-btn-border: #eee;
+      --placeholder-color: #777;
+    }
+
     *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
@@ -13,15 +51,19 @@
 
     body {
       font-family: Georgia, "Times New Roman", serif;
-      background: #f5f5f0;
-      color: #222;
+      background: var(--body-bg);
+      color: var(--body-color);
       min-height: 100vh;
       padding: 2rem 1rem;
+      transition: background 0.2s, color 0.2s;
     }
 
     header {
       max-width: 1100px;
       margin: 0 auto 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     h1 {
@@ -30,9 +72,24 @@
     }
 
     header p {
-      color: #555;
+      color: var(--header-p-color);
       font-size: 0.95rem;
+      margin-bottom: 1rem;
     }
+
+    #theme-toggle {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0.5rem;
+      color: var(--body-color);
+    }
+
+    .sun-icon, .moon-icon { display: none; }
+    .dark-theme .moon-icon { display: block; }
+    .dark-theme .sun-icon { display: none; }
+    body:not(.dark-theme) .sun-icon { display: block; }
+    body:not(.dark-theme) .moon-icon { display: none; }
 
     .workspace {
       display: grid;
@@ -51,6 +108,7 @@
     .panel {
       display: flex;
       flex-direction: column;
+      position: relative;
     }
 
     .panel-label {
@@ -58,17 +116,18 @@
       font-size: 0.8rem;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: #666;
+      color: var(--panel-label-color);
       margin-bottom: 0.4rem;
     }
 
     #input-area {
       flex: 1;
       min-height: 400px;
-      border: 2px solid #ccc;
+      border: 2px solid var(--border-color);
       border-radius: 4px;
       padding: 1rem;
-      background: #fff;
+      background: var(--panel-bg);
+      color: var(--body-color);
       overflow-y: auto;
       outline: none;
       font-size: 1rem;
@@ -77,32 +136,32 @@
     }
 
     #input-area:focus {
-      border-color: #555;
+      border-color: var(--border-focus);
     }
 
     #input-area.empty::before {
       content: attr(data-placeholder);
-      color: #aaa;
+      color: var(--placeholder-color);
       pointer-events: none;
     }
 
     #output-area {
       flex: 1;
       min-height: 400px;
-      border: 2px solid #ccc;
+      border: 2px solid var(--border-color);
       border-radius: 4px;
       padding: 1rem;
-      background: #fff;
+      background: var(--panel-bg);
+      color: var(--body-color);
       font-family: "Courier New", Courier, monospace;
       font-size: 0.9rem;
       line-height: 1.6;
       resize: none;
       outline: none;
-      color: #222;
     }
 
     #output-area:focus {
-      border-color: #555;
+      border-color: var(--border-focus);
     }
 
     .panel-actions {
@@ -115,42 +174,56 @@
       font-family: inherit;
       font-size: 0.875rem;
       padding: 0.4rem 1rem;
-      border: 1px solid #bbb;
+      border: 1px solid var(--border-color);
       border-radius: 3px;
-      background: #fff;
+      background: var(--button-bg);
+      color: var(--button-text);
       cursor: pointer;
-      color: #333;
     }
 
     button:hover {
-      background: #eee;
+      background: var(--button-hover);
     }
 
     button:active {
-      background: #ddd;
+      background: var(--button-active);
     }
 
     #copy-btn {
-      background: #222;
-      color: #fff;
-      border-color: #222;
+      position: absolute;
+      top: 1.7rem;
+      right: 0.5rem;
+      background: transparent;
+      border: none;
+      color: var(--panel-label-color);
+      padding: 0.3rem;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
     }
 
     #copy-btn:hover {
-      background: #444;
-      border-color: #444;
+      background: rgba(0,0,0,0.1);
+      color: var(--body-color);
     }
 
     #copy-btn.copied {
-      background: #2a7a2a;
-      border-color: #2a7a2a;
+      color: #2a7a2a;
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>Formatted to Markdown</h1>
-    <p>Paste formatted text on the left — markdown appears on the right.</p>
+    <div>
+      <h1>remark</h1>
+      <p>Paste formatted text on the left — markdown appears on the right.</p>
+    </div>
+    <button id="theme-toggle" title="Toggle theme">
+      <svg class="sun-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+      <svg class="moon-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </button>
   </header>
 
   <div class="workspace">
@@ -169,10 +242,13 @@
 
     <div class="panel">
       <div class="panel-label">Markdown output</div>
-      <textarea id="output-area" readonly spellcheck="false" placeholder="Markdown will appear here after you paste…"></textarea>
-      <div class="panel-actions">
-        <button id="copy-btn">Copy markdown</button>
-      </div>
+      <textarea id="output-area" spellcheck="false" placeholder="Markdown will appear here after you paste…"></textarea>
+      <button id="copy-btn" title="Copy markdown">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+          <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+        </svg>
+      </button>
     </div>
   </div>
 
@@ -320,6 +396,9 @@
         case 'style':
         case 'head':
           return '';
+        
+        case 'button': // Don't convert button text to md
+          return '';
 
         default:
           return childText(node, ctx);
@@ -402,6 +481,18 @@
     const outputArea = document.getElementById('output-area');
     const clearBtn   = document.getElementById('clear-btn');
     const copyBtn    = document.getElementById('copy-btn');
+    const themeToggle = document.getElementById('theme-toggle');
+
+    // Theme toggle
+    themeToggle.addEventListener('click', () => {
+      document.body.classList.toggle('dark-theme');
+      localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
+    });
+
+    // Check saved theme
+    if (localStorage.getItem('theme') !== 'light') {
+      document.body.classList.add('dark-theme');
+    }
 
     // Keep "empty" class in sync so the CSS placeholder shows
     function syncEmpty() {
@@ -458,25 +549,22 @@
       if (!navigator.clipboard) {
         // Clipboard API not available (insecure context) — select text for manual copy
         outputArea.select();
-        copyBtn.textContent = 'Text selected — press Ctrl+C';
-        setTimeout(function () { copyBtn.textContent = 'Copy markdown'; }, 3000);
+        alert('Text selected — press Ctrl+C to copy');
         return;
       }
 
       navigator.clipboard.writeText(outputArea.value).then(function () {
-        copyBtn.textContent = 'Copied!';
+        const originalIcon = copyBtn.innerHTML;
+        copyBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
         copyBtn.classList.add('copied');
         setTimeout(function () {
-          copyBtn.textContent = 'Copy markdown';
+          copyBtn.innerHTML = originalIcon;
           copyBtn.classList.remove('copied');
         }, 2000);
       }).catch(function () {
         // Fallback: select all text so the user can copy manually
         outputArea.select();
-        copyBtn.textContent = 'Select all & copy manually';
-        setTimeout(function () {
-          copyBtn.textContent = 'Copy markdown';
-        }, 3000);
+        alert('Select all & copy manually');
       });
     });
 
