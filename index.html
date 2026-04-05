@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Formatted to Markdown</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Georgia, "Times New Roman", serif;
+      background: #f5f5f0;
+      color: #222;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    header {
+      max-width: 1100px;
+      margin: 0 auto 2rem;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      margin-bottom: 0.4rem;
+    }
+
+    header p {
+      color: #555;
+      font-size: 0.95rem;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 700px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-label {
+      font-family: monospace;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #666;
+      margin-bottom: 0.4rem;
+    }
+
+    #input-area {
+      flex: 1;
+      min-height: 400px;
+      border: 2px solid #ccc;
+      border-radius: 4px;
+      padding: 1rem;
+      background: #fff;
+      overflow-y: auto;
+      outline: none;
+      font-size: 1rem;
+      line-height: 1.6;
+      cursor: text;
+    }
+
+    #input-area:focus {
+      border-color: #555;
+    }
+
+    #input-area.empty::before {
+      content: attr(data-placeholder);
+      color: #aaa;
+      pointer-events: none;
+    }
+
+    #output-area {
+      flex: 1;
+      min-height: 400px;
+      border: 2px solid #ccc;
+      border-radius: 4px;
+      padding: 1rem;
+      background: #fff;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      color: #222;
+    }
+
+    #output-area:focus {
+      border-color: #555;
+    }
+
+    .panel-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.6rem;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 0.875rem;
+      padding: 0.4rem 1rem;
+      border: 1px solid #bbb;
+      border-radius: 3px;
+      background: #fff;
+      cursor: pointer;
+      color: #333;
+    }
+
+    button:hover {
+      background: #eee;
+    }
+
+    button:active {
+      background: #ddd;
+    }
+
+    #copy-btn {
+      background: #222;
+      color: #fff;
+      border-color: #222;
+    }
+
+    #copy-btn:hover {
+      background: #444;
+      border-color: #444;
+    }
+
+    #copy-btn.copied {
+      background: #2a7a2a;
+      border-color: #2a7a2a;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Formatted to Markdown</h1>
+    <p>Paste formatted text on the left — markdown appears on the right.</p>
+  </header>
+
+  <div class="workspace">
+    <div class="panel">
+      <div class="panel-label">Paste formatted text here</div>
+      <div
+        id="input-area"
+        contenteditable="true"
+        data-placeholder="Paste formatted text from your browser here…"
+        class="empty"
+      ></div>
+      <div class="panel-actions">
+        <button id="clear-btn">Clear</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-label">Markdown output</div>
+      <textarea id="output-area" readonly spellcheck="false" placeholder="Markdown will appear here after you paste…"></textarea>
+      <div class="panel-actions">
+        <button id="copy-btn">Copy markdown</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ------------------------------------------------------------------ *
+     *  HTML → Markdown converter
+     * ------------------------------------------------------------------ */
+
+    function convertToMarkdown(html) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const result = convertNode(doc.body).trim();
+      // Collapse runs of 3+ blank lines down to 2
+      return result.replace(/\n{3,}/g, '\n\n');
+    }
+
+    function convertNode(node, ctx) {
+      ctx = ctx || { listDepth: 0, listType: null };
+
+      if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent;
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        return '';
+      }
+
+      const tag = node.tagName.toLowerCase();
+
+      switch (tag) {
+        case 'h1': return '\n# '    + childText(node, ctx).trim() + '\n\n';
+        case 'h2': return '\n## '   + childText(node, ctx).trim() + '\n\n';
+        case 'h3': return '\n### '  + childText(node, ctx).trim() + '\n\n';
+        case 'h4': return '\n#### ' + childText(node, ctx).trim() + '\n\n';
+        case 'h5': return '\n##### '+ childText(node, ctx).trim() + '\n\n';
+        case 'h6': return '\n###### '+ childText(node, ctx).trim() + '\n\n';
+
+        case 'p': {
+          const inner = childText(node, ctx).trim();
+          return inner ? '\n' + inner + '\n\n' : '';
+        }
+
+        case 'br': return '\n';
+
+        case 'strong':
+        case 'b': {
+          const inner = childText(node, ctx);
+          return inner.trim() ? '**' + inner + '**' : '';
+        }
+
+        case 'em':
+        case 'i': {
+          const inner = childText(node, ctx);
+          return inner.trim() ? '_' + inner + '_' : '';
+        }
+
+        case 's':
+        case 'del':
+        case 'strike': {
+          const inner = childText(node, ctx);
+          return inner.trim() ? '~~' + inner + '~~' : '';
+        }
+
+        case 'code': {
+          if (node.parentNode && node.parentNode.tagName.toLowerCase() === 'pre') {
+            return node.textContent;
+          }
+          return '`' + node.textContent + '`';
+        }
+
+        case 'pre': {
+          const codeEl = node.querySelector('code');
+          const raw = codeEl ? codeEl.textContent : node.textContent;
+          const lang = (codeEl && codeEl.className.match(/language-(\w+)/))
+            ? codeEl.className.match(/language-(\w+)/)[1]
+            : '';
+          return '\n```' + lang + '\n' + raw.trimEnd() + '\n```\n\n';
+        }
+
+        case 'a': {
+          const href  = node.getAttribute('href') || '';
+          const title = node.getAttribute('title');
+          const text  = childText(node, ctx) || href;
+          const titlePart = title ? ' "' + title + '"' : '';
+          if (!href) return text;
+          return '[' + text + '](' + href + titlePart + ')';
+        }
+
+        case 'img': {
+          const src   = node.getAttribute('src') || '';
+          const alt   = node.getAttribute('alt') || '';
+          const title = node.getAttribute('title');
+          const titlePart = title ? ' "' + title + '"' : '';
+          return '![' + alt + '](' + src + titlePart + ')';
+        }
+
+        case 'ul':
+          return convertList(node, '-', ctx.listDepth || 0) + '\n';
+
+        case 'ol':
+          return convertList(node, '1.', ctx.listDepth || 0) + '\n';
+
+        case 'li':
+          // Handled inside convertList
+          return childText(node, ctx);
+
+        case 'blockquote': {
+          const inner = childText(node, ctx).trim();
+          const quoted = inner.split('\n').map(l => '> ' + l).join('\n');
+          return '\n' + quoted + '\n\n';
+        }
+
+        case 'hr': return '\n---\n\n';
+
+        case 'table': return '\n' + convertTable(node) + '\n';
+
+        // These are handled as part of table conversion
+        case 'thead':
+        case 'tbody':
+        case 'tfoot':
+        case 'tr':
+        case 'th':
+        case 'td':
+          return childText(node, ctx);
+
+        // Purely structural wrappers
+        case 'div':
+        case 'section':
+        case 'article':
+        case 'main':
+        case 'aside':
+        case 'header':
+        case 'footer':
+        case 'nav': {
+          const inner = childText(node, ctx).trim();
+          return inner ? '\n' + inner + '\n\n' : '';
+        }
+
+        case 'body':
+        case 'html':
+          return childText(node, ctx);
+
+        // Skip non-content elements
+        case 'script':
+        case 'style':
+        case 'head':
+          return '';
+
+        default:
+          return childText(node, ctx);
+      }
+    }
+
+    function childText(node, ctx) {
+      return Array.from(node.childNodes)
+        .map(child => convertNode(child, ctx))
+        .join('');
+    }
+
+    /* List conversion - handles nesting */
+    function convertList(listNode, marker, depth) {
+      const indent = '  '.repeat(depth);
+      const lines  = [];
+      let counter  = 1;
+
+      for (const child of listNode.childNodes) {
+        if (child.nodeType !== Node.ELEMENT_NODE) continue;
+        if (child.tagName.toLowerCase() !== 'li') continue;
+
+        const itemMarker = (marker === '1.') ? counter + '.' : marker;
+
+        // Separate direct content from nested lists
+        let itemContent = '';
+        const nestedParts = [];
+
+        for (const liChild of child.childNodes) {
+          const ltag = liChild.nodeType === Node.ELEMENT_NODE
+            ? liChild.tagName.toLowerCase()
+            : null;
+
+          if (ltag === 'ul') {
+            nestedParts.push(convertList(liChild, '-', depth + 1));
+          } else if (ltag === 'ol') {
+            nestedParts.push(convertList(liChild, '1.', depth + 1));
+          } else {
+            itemContent += convertNode(liChild, { listDepth: depth + 1 });
+          }
+        }
+
+        lines.push(indent + itemMarker + ' ' + itemContent.trim());
+        if (nestedParts.length) {
+          lines.push(nestedParts.join('\n'));
+        }
+        counter++;
+      }
+
+      return lines.join('\n');
+    }
+
+    /* Table conversion */
+    function convertTable(tableNode) {
+      const allRows = Array.from(tableNode.querySelectorAll('tr'));
+      if (!allRows.length) return '';
+
+      const lines = [];
+
+      allRows.forEach((row, rowIdx) => {
+        const cells = Array.from(row.querySelectorAll('th, td'));
+        const cellTexts = cells.map(c => c.textContent.trim().replace(/\n/g, ' ').replace(/\|/g, '\\|'));
+        lines.push('| ' + cellTexts.join(' | ') + ' |');
+
+        // Insert separator after first row
+        if (rowIdx === 0) {
+          const sep = cells.map(() => '---').join(' | ');
+          lines.push('| ' + sep + ' |');
+        }
+      });
+
+      return lines.join('\n') + '\n';
+    }
+
+    /* ------------------------------------------------------------------ *
+     *  UI wiring
+     * ------------------------------------------------------------------ */
+
+    const inputArea  = document.getElementById('input-area');
+    const outputArea = document.getElementById('output-area');
+    const clearBtn   = document.getElementById('clear-btn');
+    const copyBtn    = document.getElementById('copy-btn');
+
+    // Keep "empty" class in sync so the CSS placeholder shows
+    function syncEmpty() {
+      if (inputArea.textContent.trim() === '') {
+        inputArea.classList.add('empty');
+      } else {
+        inputArea.classList.remove('empty');
+      }
+    }
+
+    inputArea.addEventListener('paste', function (e) {
+      e.preventDefault();
+
+      const html = e.clipboardData.getData('text/html');
+
+      if (html) {
+        // Display a sanitized preview — strip elements and attributes that could run scripts
+        const parser = new DOMParser();
+        const doc    = parser.parseFromString(html, 'text/html');
+        doc.querySelectorAll('script, style, iframe, object, embed').forEach(el => el.remove());
+        // Remove event-handler attributes (e.g. onerror, onload) from all elements
+        doc.querySelectorAll('*').forEach(function (el) {
+          Array.from(el.attributes).forEach(function (attr) {
+            if (attr.name.toLowerCase().startsWith('on')) {
+              el.removeAttribute(attr.name);
+            }
+          });
+        });
+        inputArea.innerHTML = doc.body.innerHTML;
+
+        // Convert to markdown
+        outputArea.value = convertToMarkdown(html);
+      } else {
+        // Plain text fallback
+        const text = e.clipboardData.getData('text/plain');
+        inputArea.textContent = text;
+        outputArea.value = text;
+      }
+
+      syncEmpty();
+    });
+
+    inputArea.addEventListener('input', syncEmpty);
+
+    clearBtn.addEventListener('click', function () {
+      inputArea.innerHTML = '';
+      outputArea.value    = '';
+      syncEmpty();
+    });
+
+    copyBtn.addEventListener('click', function () {
+      if (!outputArea.value) return;
+
+      if (!navigator.clipboard) {
+        // Clipboard API not available (insecure context) — select text for manual copy
+        outputArea.select();
+        copyBtn.textContent = 'Text selected — press Ctrl+C';
+        setTimeout(function () { copyBtn.textContent = 'Copy markdown'; }, 3000);
+        return;
+      }
+
+      navigator.clipboard.writeText(outputArea.value).then(function () {
+        copyBtn.textContent = 'Copied!';
+        copyBtn.classList.add('copied');
+        setTimeout(function () {
+          copyBtn.textContent = 'Copy markdown';
+          copyBtn.classList.remove('copied');
+        }, 2000);
+      }).catch(function () {
+        // Fallback: select all text so the user can copy manually
+        outputArea.select();
+        copyBtn.textContent = 'Select all & copy manually';
+        setTimeout(function () {
+          copyBtn.textContent = 'Copy markdown';
+        }, 3000);
+      });
+    });
+
+    // Initial state
+    syncEmpty();
+  </script>
+</body>
+</html>
